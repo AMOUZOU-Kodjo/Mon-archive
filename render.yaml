@@ -19,13 +19,13 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
-      - key: B2_ENDPOINT
-        value: https://s3.us-west-002.backblazeb2.com
-      - key: B2_REGION
-        value: us-west-002
-      - key: B2_ACCESS_KEY_ID
+      - key: R2_ACCOUNT_ID
         sync: false
-      - key: B2_SECRET_ACCESS_KEY
+      - key: R2_ACCESS_KEY_ID
         sync: false
-      - key: B2_BUCKET
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        value: mon-archive
+      - key: R2_PUBLIC_URL
         sync: false

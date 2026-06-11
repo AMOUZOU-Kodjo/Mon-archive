@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import pool from '../config/database.js';
 import { generatePdfThumbnail } from '../utils/pdfThumbnail.js';
-import { isProduction, uploadToB2 } from '../utils/storage.js';
+import { isProduction, uploadToR2 } from '../utils/storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
@@ -87,11 +87,11 @@ export async function uploadFile(req, res) {
       const thumbKey = `thumbnails/thumb-${baseKey.replace(/\.[^.]+$/, '.jpg')}`;
 
       if (isProduction()) {
-        // ── B2 (> 10 Mo, production) ──
-        url = await uploadToB2(buffer, baseKey, mimetype);
+        // ── R2 (> 10 Mo, production) ──
+        url = await uploadToR2(buffer, baseKey, mimetype);
         try {
           const thumbBuffer = await generatePdfThumbnail(buffer);
-          url_thumbnail = await uploadToB2(thumbBuffer, thumbKey, 'image/jpeg');
+          url_thumbnail = await uploadToR2(thumbBuffer, thumbKey, 'image/jpeg');
         } catch (thumbErr) {
           console.error('Échec génération vignette PDF B2:', thumbErr.message);
         }
@@ -192,11 +192,11 @@ export async function importPdfByUrl(req, res) {
       const thumbKey = `thumbnails/thumb-${baseKey.replace(/\.[^.]+$/, '.jpg')}`;
 
       if (isProduction()) {
-        // ── B2 (> 10 Mo, production) ──
-        pdfUrl = await uploadToB2(pdfBuf, baseKey, 'application/pdf');
+        // ── R2 (> 10 Mo, production) ──
+        pdfUrl = await uploadToR2(pdfBuf, baseKey, 'application/pdf');
         try {
           const thumbBuffer = await generatePdfThumbnail(pdfBuf);
-          url_thumbnail = await uploadToB2(thumbBuffer, thumbKey, 'image/jpeg');
+          url_thumbnail = await uploadToR2(thumbBuffer, thumbKey, 'image/jpeg');
         } catch (thumbErr) {
           console.error('Échec génération vignette PDF B2 (import):', thumbErr.message);
         }

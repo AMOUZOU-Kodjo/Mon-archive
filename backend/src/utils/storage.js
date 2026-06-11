@@ -4,30 +4,31 @@ let client = null;
 
 function getClient() {
   if (!client) {
+    const accountId = process.env.R2_ACCOUNT_ID;
     client = new S3Client({
-      endpoint: process.env.B2_ENDPOINT,
-      region: process.env.B2_REGION || 'us-west-002',
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      region: 'auto',
       credentials: {
-        accessKeyId: process.env.B2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.B2_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
       },
-      forcePathStyle: true,
     });
   }
   return client;
 }
 
 export function getBucket() {
-  return process.env.B2_BUCKET || 'mon-archive';
+  return process.env.R2_BUCKET || 'mon-archive';
 }
 
-export function getBaseUrl() {
-  // e.g. https://f000.backblazeb2.com/file/mon-archive/
-  const endpoint = process.env.B2_ENDPOINT || 'https://s3.us-west-002.backblazeb2.com';
-  return `${endpoint}/${getBucket()}/`;
+export function getPublicUrl(key) {
+  if (process.env.R2_PUBLIC_URL) {
+    return `${process.env.R2_PUBLIC_URL}/${key}`;
+  }
+  return `${process.env.R2_ACCOUNT_ID}.r2.dev/${getBucket()}/${key}`;
 }
 
-export async function uploadToB2(buffer, key, mimeType = 'application/octet-stream') {
+export async function uploadToR2(buffer, key, mimeType = 'application/octet-stream') {
   const cmd = new PutObjectCommand({
     Bucket: getBucket(),
     Key: key,
@@ -35,10 +36,10 @@ export async function uploadToB2(buffer, key, mimeType = 'application/octet-stre
     ContentType: mimeType,
   });
   await getClient().send(cmd);
-  return `${getBaseUrl()}${key}`;
+  return getPublicUrl(key);
 }
 
-export async function deleteFromB2(key) {
+export async function deleteFromR2(key) {
   const cmd = new DeleteObjectCommand({
     Bucket: getBucket(),
     Key: key,
