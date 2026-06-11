@@ -5,6 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import pool from '../config/database.js';
 import { generatePdfThumbnail } from '../utils/pdfThumbnail.js';
+import { isProduction, uploadToB2 } from '../utils/storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
@@ -82,22 +83,31 @@ export async function uploadFile(req, res) {
     const isLarge = isPDF && size > MAX_CLOUDINARY_BYTES;
 
     if (isLarge) {
-      // ── STOCKAGE LOCAL (> 10 Mo) ──
-      const localName = makePublicId('doc', originalname) + path.extname(originalname);
-      const thumbName = `thumb-${localName.replace(/\.[^.]+$/, '.jpg')}`;
+      const baseKey = makePublicId('doc', originalname) + path.extname(originalname);
+      const thumbKey = `thumbnails/thumb-${baseKey.replace(/\.[^.]+$/, '.jpg')}`;
 
-      const filePath = path.join(UPLOADS_DIR, localName);
-      const thumbPath = path.join(UPLOADS_DIR, 'thumbnails', thumbName);
-
-      fs.writeFileSync(filePath, buffer);
-      url = `/api/files/${localName}`;
-
-      try {
-        const thumbBuffer = await generatePdfThumbnail(buffer);
-        fs.writeFileSync(thumbPath, thumbBuffer);
-        url_thumbnail = `/api/files/thumbnails/${thumbName}`;
-      } catch (thumbErr) {
-        console.error('Échec génération vignette PDF local:', thumbErr.message);
+      if (isProduction()) {
+        // ── B2 (> 10 Mo, production) ──
+        url = await uploadToB2(buffer, baseKey, mimetype);
+        try {
+          const thumbBuffer = await generatePdfThumbnail(buffer);
+          url_thumbnail = await uploadToB2(thumbBuffer, thumbKey, 'image/jpeg');
+        } catch (thumbErr) {
+          console.error('Échec génération vignette PDF B2:', thumbErr.message);
+        }
+      } else {
+        // ── STOCKAGE LOCAL (> 10 Mo, dev) ──
+        const filePath = path.join(UPLOADS_DIR, baseKey);
+        const thumbPath = path.join(UPLOADS_DIR, thumbKey);
+        fs.writeFileSync(filePath, buffer);
+        url = `/api/files/${baseKey}`;
+        try {
+          const thumbBuffer = await generatePdfThumbnail(buffer);
+          fs.writeFileSync(thumbPath, thumbBuffer);
+          url_thumbnail = `/api/files/${thumbKey}`;
+        } catch (thumbErr) {
+          console.error('Échec génération vignette PDF local:', thumbErr.message);
+        }
       }
     } else {
       // ── UPLOAD CLOUDINARY (≤ 10 Mo) ──
@@ -178,22 +188,31 @@ export async function importPdfByUrl(req, res) {
     let url_thumbnail = '';
 
     if (isLarge) {
-      // ── STOCKAGE LOCAL (> 10 Mo) ──
-      const localName = makePublicId('import', titre) + '.pdf';
-      const thumbName = `thumb-${localName.replace(/\.[^.]+$/, '.jpg')}`;
+      const baseKey = makePublicId('import', titre) + '.pdf';
+      const thumbKey = `thumbnails/thumb-${baseKey.replace(/\.[^.]+$/, '.jpg')}`;
 
-      const filePath = path.join(UPLOADS_DIR, localName);
-      const thumbPath = path.join(UPLOADS_DIR, 'thumbnails', thumbName);
-
-      fs.writeFileSync(filePath, pdfBuf);
-      pdfUrl = `/api/files/${localName}`;
-
-      try {
-        const thumbBuffer = await generatePdfThumbnail(pdfBuf);
-        fs.writeFileSync(thumbPath, thumbBuffer);
-        url_thumbnail = `/api/files/thumbnails/${thumbName}`;
-      } catch (thumbErr) {
-        console.error('Échec génération vignette PDF local (import):', thumbErr.message);
+      if (isProduction()) {
+        // ── B2 (> 10 Mo, production) ──
+        pdfUrl = await uploadToB2(pdfBuf, baseKey, 'application/pdf');
+        try {
+          const thumbBuffer = await generatePdfThumbnail(pdfBuf);
+          url_thumbnail = await uploadToB2(thumbBuffer, thumbKey, 'image/jpeg');
+        } catch (thumbErr) {
+          console.error('Échec génération vignette PDF B2 (import):', thumbErr.message);
+        }
+      } else {
+        // ── STOCKAGE LOCAL (> 10 Mo, dev) ──
+        const filePath = path.join(UPLOADS_DIR, baseKey);
+        const thumbPath = path.join(UPLOADS_DIR, thumbKey);
+        fs.writeFileSync(filePath, pdfBuf);
+        pdfUrl = `/api/files/${baseKey}`;
+        try {
+          const thumbBuffer = await generatePdfThumbnail(pdfBuf);
+          fs.writeFileSync(thumbPath, thumbBuffer);
+          url_thumbnail = `/api/files/${thumbKey}`;
+        } catch (thumbErr) {
+          console.error('Échec génération vignette PDF local (import):', thumbErr.message);
+        }
       }
     } else {
       // ── UPLOAD CLOUDINARY (≤ 10 Mo) ──

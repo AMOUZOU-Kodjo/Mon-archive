@@ -10,10 +10,12 @@ import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '..', 'uploads');
-['', 'thumbnails'].forEach(dir => {
-  const p = path.join(uploadsDir, dir);
-  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
-});
+if (process.env.NODE_ENV !== 'production') {
+  ['', 'thumbnails'].forEach(dir => {
+    const p = path.join(uploadsDir, dir);
+    if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+  });
+}
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -30,7 +32,7 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet()); // Sécurisation des en-têtes HTTP
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? 'https://mon-archive.vercel.app'
+    ? (process.env.FRONTEND_URL || 'https://mon-archive.vercel.app')
     : 'http://localhost:3000',
   credentials: true,
 }));

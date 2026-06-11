@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Instance Axios préconfigurée pour communiquer avec le backend
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   headers: {
     'Content-Type': 'application/json',
   },
