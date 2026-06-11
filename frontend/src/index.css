@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === Styles globaux === */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply min-h-screen bg-base-200 text-base-content font-sans antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* === Animations personnalisées === */
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.slide-up {
+  animation: slideUp 0.6s ease-out forwards;
+}
+
+/* Stagger animation pour les grilles */
+.stagger-item {
+  opacity: 0;
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+.stagger-item:nth-child(1) { animation-delay: 0.03s; }
+.stagger-item:nth-child(2) { animation-delay: 0.07s; }
+.stagger-item:nth-child(3) { animation-delay: 0.11s; }
+.stagger-item:nth-child(4) { animation-delay: 0.15s; }
+.stagger-item:nth-child(5) { animation-delay: 0.19s; }
+.stagger-item:nth-child(6) { animation-delay: 0.23s; }
+.stagger-item:nth-child(7) { animation-delay: 0.27s; }
+.stagger-item:nth-child(8) { animation-delay: 0.31s; }
+.stagger-item:nth-child(9) { animation-delay: 0.35s; }
+.stagger-item:nth-child(10) { animation-delay: 0.39s; }
+.stagger-item:nth-child(11) { animation-delay: 0.43s; }
+.stagger-item:nth-child(12) { animation-delay: 0.47s; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shine effect on card hover */
+@keyframes shine {
+  0% { transform: translateX(-100%) rotate(20deg); }
+  100% { transform: translateX(250%) rotate(20deg); }
+}
+
+.shine-hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.06) 45%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 55%,
+    transparent 70%
+  );
+  pointer-events: none;
+  transform: translateX(-100%) rotate(20deg);
+}
+
+.shine-hover:hover::after {
+  animation: shine 0.7s ease-out forwards;
+}
+
+/* Page enter animation (portfolio style) */
+.page-enter {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* === Scrollbar personnalisée === */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-base-200;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-base-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-base-content/30;
+}
