@@ -7,6 +7,7 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
+  timeout: 600000,
 });
 
 // Stockage en mémoire pour Multer (les fichiers sont ensuite envoyés à Cloudinary)
@@ -64,6 +65,7 @@ export async function uploadFile(req, res) {
           folder,
           resource_type: resourceType,
           public_id: `${Date.now()}-${originalname.split('.')[0]}`,
+          timeout: 600000,
         },
         (error, result) => {
           if (error) reject(error);
@@ -130,6 +132,7 @@ export async function importPdfByUrl(req, res) {
           folder: 'mon-archive/documents',
           resource_type: 'image',
           public_id: `import-${Date.now()}`,
+          timeout: 600000,
         },
         (error, result) => {
           if (error) reject(error);
