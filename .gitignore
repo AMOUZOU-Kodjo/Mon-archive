@@ -11,6 +11,9 @@ frontend/dist/
 *.log
 npm-debug.log*
 
+# Uploads locaux (fichiers > 10 Mo)
+backend/uploads/
+
 # OS
 .DS_Store
 Thumbs.db

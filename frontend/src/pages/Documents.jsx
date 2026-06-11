@@ -20,7 +20,7 @@ export default function Documents() {
 
   useEffect(() => {
     setLoading(true);
-    const params = new URLSearchParams({ type: 'document', page, limit: 12 });
+    const params = new URLSearchParams({ type: 'document', page, limit: 9 });
     if (searchTerm) params.append('search', searchTerm);
     if (selectedCategory) params.append('categorie', selectedCategory);
     Promise.all([

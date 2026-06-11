@@ -86,7 +86,7 @@ export default function MediaCard({ media, onDelete, onEdit, onClick }) {
       {/* Colored accent bar at bottom */}
       <div className={`absolute bottom-0 left-0 right-0 h-[3px] rounded-b-[1rem] ${accentBar} opacity-80 transition-all duration-300 group-hover:h-[4px] group-hover:opacity-100 z-30`} />
 
-      <figure className="relative aspect-video overflow-hidden bg-base-300 shrink-0">
+      <figure className={`relative overflow-hidden bg-base-300 shrink-0 ${media.type === 'document' ? 'aspect-[2/1]' : 'aspect-video'}`}>
         {/* Image de fond / vignette */}
         {media.type === 'photo' && (
           <LazyImage
@@ -210,9 +210,20 @@ export default function MediaCard({ media, onDelete, onEdit, onClick }) {
               ? `${media.nom_fichier?.split('.').pop()?.toUpperCase() || 'PDF'}`
               : typeLabels[media.type]}
           </span>
-          {media.type === 'document' && media.pages > 0 && (
-            <span className="badge badge-ghost badge-xs">{media.pages} p.</span>
-          )}
+          <div className="flex items-center gap-1">
+            {media.type === 'document' && media.pages > 0 && (
+              <span className="badge badge-ghost badge-xs">{media.pages} p.</span>
+            )}
+            <a
+              href={media.url}
+              download
+              onClick={(e) => e.stopPropagation()}
+              className="btn btn-ghost btn-sm text-base-content/50 hover:text-primary transition-colors gap-1 min-h-0 h-8 px-2"
+              title="Télécharger"
+            >
+              <HiOutlineDownload className="text-base" />
+            </a>
+          </div>
         </div>
 
         {isAdmin && (

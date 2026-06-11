@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { HiOutlineLink, HiOutlineUpload, HiOutlinePhotograph, HiOutlineVideoCamera, HiOutlineMusicNote, HiOutlineDocumentText, HiOutlineCheck, HiOutlineX, HiOutlineCloudUpload } from 'react-icons/hi';
+import { HiOutlineLink, HiOutlineUpload, HiOutlinePhotograph, HiOutlineVideoCamera, HiOutlineMusicNote, HiOutlineDocumentText, HiOutlineCheck, HiOutlineX, HiOutlineCloudUpload, HiOutlineExclamationCircle } from 'react-icons/hi';
 import { getYouTubeThumbnail } from '../utils/thumbnails';
 import api from '../utils/api';
 
@@ -23,6 +23,9 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
   const [tags, setTags] = useState('');
   const [pages, setPages] = useState('');
   const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [uploadResults, setUploadResults] = useState([]);
+  const [currentFileIndex, setCurrentFileIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +33,7 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
   const fileInputRef = useRef(null);
 
   const currentType = types.find((t) => t.value === type);
+  const isMulti = files.length > 1;
 
   const resetForm = () => {
     setTitre('');
@@ -38,6 +42,9 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
     setTags('');
     setPages('');
     setFile(null);
+    setFiles([]);
+    setUploadResults([]);
+    setCurrentFileIndex(-1);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -68,44 +75,65 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
   };
 
   // === Mode FICHIER ===
+  const uploadSingleFile = async (f, index) => {
+    const formData = new FormData();
+    formData.append('fichier', f);
+    formData.append('titre', f.name.replace(/\.[^.]+$/, ''));
+    formData.append('description', description);
+    formData.append('tags', tags);
+    formData.append('pages', pages || 0);
+    await api.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (e) => {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        setUploadProgress(pct);
+      },
+    });
+  };
+
   const handleFileSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!file || !titre) { setError('Le fichier et le titre sont requis.'); return; }
+    if (files.length === 0) { setError('Sélectionnez au moins un fichier.'); return; }
     setLoading(true);
+    setUploadResults([]);
     setUploadProgress(0);
-    try {
-      const formData = new FormData();
-      formData.append('fichier', file);
-      formData.append('titre', titre);
-      formData.append('description', description);
-      formData.append('tags', tags);
-      formData.append('pages', pages || 0);
-      await api.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (e) => {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          setUploadProgress(pct);
-        },
-      });
-      setUploadProgress(100);
+
+    const results = [];
+    for (let i = 0; i < files.length; i++) {
+      setCurrentFileIndex(i);
+      setUploadProgress(0);
+      try {
+        await uploadSingleFile(files[i], i);
+        results.push({ file: files[i].name, ok: true });
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message || 'Erreur inconnue';
+        results.push({ file: files[i].name, ok: false, error: msg });
+      }
+    }
+
+    setUploadResults(results);
+    setCurrentFileIndex(-1);
+    setLoading(false);
+    const okCount = results.filter(r => r.ok).length;
+    if (okCount === files.length) {
       setSuccess(true);
       resetForm();
-      setTimeout(() => setSuccess(false), 3000);
+      setTimeout(() => setSuccess(false), 4000);
       onAddComplete?.();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Erreur lors de l\'upload.');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleFileChange = (e) => {
-    const f = e.target.files?.[0];
-    if (f) {
-      setFile(f);
-      if (!titre) setTitre(f.name.replace(/\.[^.]+$/, ''));
+    const selected = Array.from(e.target.files || []);
+    if (selected.length > 10) {
+      setError('Maximum 10 fichiers à la fois.');
+      return;
     }
+    setFile(selected[0]);
+    setFiles(selected);
+    setUploadResults([]);
+    setError('');
   };
 
   return (
@@ -239,21 +267,28 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
       {mode === 'file' && (
         <form onSubmit={handleFileSubmit} className="space-y-3">
           <div className="form-control">
-            <label className="label"><span className="label-text">Fichier</span></label>
+            <label className="label"><span className="label-text">Fichiers (max 10)</span></label>
             <div
               onClick={() => fileInputRef.current?.click()}
               className="border-2 border-dashed border-base-300 hover:border-primary/50 rounded-xl p-6 text-center cursor-pointer transition-all"
             >
-              {file ? (
-                <div className="flex items-center justify-center gap-3">
-                  <HiOutlineCheck className="text-success text-xl" />
-                  <span className="text-sm font-medium truncate max-w-[250px]">{file.name}</span>
-                  <span className="text-xs text-base-content/40">({(file.size / 1024 / 1024).toFixed(1)} Mo)</span>
+              {files.length > 0 ? (
+                <div className="space-y-1.5">
+                  {files.slice(0, 5).map((f, i) => (
+                    <div key={i} className="flex items-center justify-start gap-2 text-sm">
+                      <HiOutlineCheck className="text-success shrink-0" />
+                      <span className="truncate">{f.name}</span>
+                      <span className="text-xs text-base-content/40 shrink-0">({(f.size / 1024 / 1024).toFixed(1)} Mo)</span>
+                    </div>
+                  ))}
+                  {files.length > 5 && (
+                    <p className="text-xs text-base-content/40">... et {files.length - 5} autre(s)</p>
+                  )}
                 </div>
               ) : (
                 <div>
                   <HiOutlineCloudUpload className="text-3xl text-base-content/30 mx-auto mb-2" />
-                  <p className="text-sm text-base-content/50">Cliquez pour sélectionner un fichier</p>
+                  <p className="text-sm text-base-content/50">Cliquez pour sélectionner des fichiers</p>
                   <p className="text-xs text-base-content/30 mt-1">
                     {currentType ? types.find(t => t.value === type)?.accept.replace(/,/g, ', ') : 'Tous les types'}
                   </p>
@@ -262,48 +297,70 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
               <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 accept={currentType ? types.find(t => t.value === type)?.accept : undefined}
                 onChange={handleFileChange}
                 className="hidden"
               />
             </div>
+            {files.length > 0 && (
+              <label className="label">
+                <span className="label-text-alt text-base-content/50">{files.length} fichier(s) sélectionné(s) — les titres seront les noms des fichiers</span>
+              </label>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="form-control">
-              <label className="label"><span className="label-text">Titre</span></label>
-              <input type="text" placeholder="Titre" value={titre} onChange={(e) => setTitre(e.target.value)} className="input input-bordered focus:outline-none" required />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Tags</span></label>
+              <label className="label"><span className="label-text">Tags (commun)</span></label>
               <input type="text" placeholder="travail, perso" value={tags} onChange={(e) => setTags(e.target.value)} className="input input-bordered focus:outline-none" />
             </div>
+            {type === 'document' && (
+              <div className="form-control">
+                <label className="label"><span className="label-text">Pages (commun)</span></label>
+                <input type="number" min="1" placeholder="ex: 24" value={pages} onChange={(e) => setPages(e.target.value)} className="input input-bordered focus:outline-none w-32" />
+              </div>
+            )}
           </div>
 
           <div className="form-control">
-            <label className="label"><span className="label-text">Description</span></label>
-            <textarea placeholder="Description..." value={description} onChange={(e) => setDescription(e.target.value)} className="textarea textarea-bordered focus:outline-none" rows={2} />
+            <label className="label"><span className="label-text">Description (commune)</span></label>
+            <textarea placeholder="Description appliquée à tous les fichiers..." value={description} onChange={(e) => setDescription(e.target.value)} className="textarea textarea-bordered focus:outline-none" rows={2} />
           </div>
 
-          {type === 'document' && (
-            <div className="form-control">
-              <label className="label"><span className="label-text">Nombre de pages</span></label>
-              <input type="number" min="1" placeholder="ex: 24" value={pages} onChange={(e) => setPages(e.target.value)} className="input input-bordered focus:outline-none w-32" />
-            </div>
-          )}
-
+          {/* Progression */}
           {loading && (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-base-content/60">
-                <span>Upload en cours...</span>
-                <span>{uploadProgress}%</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-base-content/70">
+                  Fichier {currentFileIndex + 1}/{files.length}
+                  {files[currentFileIndex] && <> — <span className="font-medium">{files[currentFileIndex].name}</span></>}
+                </span>
+                <span className="text-base-content/50">{uploadProgress}%</span>
               </div>
               <progress className="progress progress-primary w-full" value={uploadProgress} max="100" />
             </div>
           )}
 
-          <button type="submit" disabled={loading} className="btn btn-primary w-full shadow-sm">
-            {loading ? <><HiOutlineUpload className="text-lg" /> Upload en cours...</> : <><HiOutlineUpload className="text-lg" /> Uploader le fichier</>}
+          {/* Résultats */}
+          {uploadResults.length > 0 && !loading && (
+            <div className="space-y-1.5 text-sm">
+              {uploadResults.map((r, i) => (
+                <div key={i} className={`flex items-center gap-2 ${r.ok ? 'text-success' : 'text-error'}`}>
+                  {r.ok ? <HiOutlineCheck className="shrink-0" /> : <HiOutlineExclamationCircle className="shrink-0" />}
+                  <span className="truncate">{r.file}</span>
+                  {!r.ok && <span className="text-xs opacity-70 truncate">{r.error}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button type="submit" disabled={loading || files.length === 0} className="btn btn-primary w-full shadow-sm">
+            {loading ? (
+              <><span className="loading loading-spinner loading-sm" /> Upload en cours...</>
+            ) : (
+              <><HiOutlineUpload className="text-lg" /> Tout uploader ({files.length})</>
+            )}
           </button>
         </form>
       )}

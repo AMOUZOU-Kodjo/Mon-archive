@@ -96,7 +96,11 @@ export function getMediaThumbnail(media) {
   if (media.url_thumbnail) return media.url_thumbnail;
   if (media.type === 'photo') return getPhotoThumbnail(media.url);
   if (media.type === 'video') return getVideoThumbnail(media.url) || getYouTubeThumbnail(media.url);
-  if (media.type === 'document') return getPdfThumbnail(media.url);
+  if (media.type === 'document') {
+    // PDF stocké en raw → pas de vignette pg_1 possible, fallback icône
+    if (media.url?.includes('/raw/upload/')) return null;
+    return getPdfThumbnail(media.url);
+  }
   return null;
 }
 

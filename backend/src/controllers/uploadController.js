@@ -1,6 +1,14 @@
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import pool from '../config/database.js';
+import { generatePdfThumbnail } from '../utils/pdfThumbnail.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+const MAX_CLOUDINARY_BYTES = 10 * 1024 * 1024; // 10 Mo — limite Cloudinary Free
 
 // Configuration de Cloudinary
 cloudinary.config({
@@ -10,7 +18,7 @@ cloudinary.config({
   timeout: 600000,
 });
 
-// Stockage en mémoire pour Multer (les fichiers sont ensuite envoyés à Cloudinary)
+// Stockage en mémoire pour Multer (les fichiers sont ensuite envoyés à Cloudinary ou au disque)
 const storage = multer.memoryStorage();
 
 const upload = multer({
@@ -38,9 +46,20 @@ const upload = multer({
 // Middleware pour un fichier unique
 export const uploadSingle = upload.single('fichier');
 
-/**
- * Upload d'un fichier vers Cloudinary et enregistrement en base de données.
- */
+/* ───── helpers ───── */
+
+function slugify(name) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_').toLowerCase();
+}
+
+function makePublicId(prefix, originalname) {
+  const ext = path.extname(originalname);
+  const base = path.basename(originalname, ext).replace(/[^a-zA-Z0-9]/g, '_');
+  return `${prefix}-${Date.now()}-${base}`;
+}
+
+/* ───── uploadFile ───── */
+
 export async function uploadFile(req, res) {
   try {
     if (!req.file) {
@@ -50,43 +69,8 @@ export async function uploadFile(req, res) {
     const { originalname, size, mimetype, buffer } = req.file;
     const { titre, description, tags, categorie, pages } = req.body;
 
-    // Déterminer le dossier Cloudinary et le resource_type
-    let folder = 'mon-archive';
-    let resourceType = 'auto';
-    if (mimetype.startsWith('image/')) { folder += '/photos'; resourceType = 'image'; }
-    else if (mimetype.startsWith('video/')) { folder += '/videos'; resourceType = 'video'; }
-    else if (mimetype.startsWith('audio/')) { folder += '/audios'; resourceType = 'video'; }
-    else if (mimetype === 'application/pdf') { folder += '/documents'; resourceType = 'image'; }
-
-    // Upload du fichier vers Cloudinary
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder,
-          resource_type: resourceType,
-          public_id: `${Date.now()}-${originalname.split('.')[0]}`,
-          timeout: 600000,
-        },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-      stream.end(buffer);
-    });
-
-    const url = result.secure_url;
-
-    // Générer une miniature pour les photos
+    let url = '';
     let url_thumbnail = '';
-    if (mimetype.startsWith('image/')) {
-      url_thumbnail = cloudinary.url(result.public_id, {
-        width: 400,
-        height: 400,
-        crop: 'fill',
-        format: 'webp',
-      });
-    }
 
     // Déterminer le type de média
     let type = 'document';
@@ -94,7 +78,64 @@ export async function uploadFile(req, res) {
     else if (mimetype.startsWith('video/')) type = 'video';
     else if (mimetype.startsWith('audio/')) type = 'audio';
 
-    // Enregistrer dans la base de données
+    const isPDF = mimetype === 'application/pdf';
+    const isLarge = isPDF && size > MAX_CLOUDINARY_BYTES;
+
+    if (isLarge) {
+      // ── STOCKAGE LOCAL (> 10 Mo) ──
+      const localName = makePublicId('doc', originalname) + path.extname(originalname);
+      const thumbName = `thumb-${localName.replace(/\.[^.]+$/, '.jpg')}`;
+
+      const filePath = path.join(UPLOADS_DIR, localName);
+      const thumbPath = path.join(UPLOADS_DIR, 'thumbnails', thumbName);
+
+      fs.writeFileSync(filePath, buffer);
+      url = `/api/files/${localName}`;
+
+      try {
+        const thumbBuffer = await generatePdfThumbnail(buffer);
+        fs.writeFileSync(thumbPath, thumbBuffer);
+        url_thumbnail = `/api/files/thumbnails/${thumbName}`;
+      } catch (thumbErr) {
+        console.error('Échec génération vignette PDF local:', thumbErr.message);
+      }
+    } else {
+      // ── UPLOAD CLOUDINARY (≤ 10 Mo) ──
+      let folder = 'mon-archive';
+      let resourceType = 'auto';
+
+      if (mimetype.startsWith('image/')) { folder += '/photos'; resourceType = 'image'; }
+      else if (mimetype.startsWith('video/')) { folder += '/videos'; resourceType = 'video'; }
+      else if (mimetype.startsWith('audio/')) { folder += '/audios'; resourceType = 'video'; }
+      else if (isPDF) { folder += '/documents'; resourceType = 'image'; }
+
+      const publicId = makePublicId('upload', originalname);
+
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder, resource_type: resourceType, public_id: publicId, timeout: 600000 },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        stream.end(buffer);
+      });
+
+      url = result.secure_url;
+
+      if (mimetype.startsWith('image/')) {
+        url_thumbnail = cloudinary.url(result.public_id, {
+          width: 400, height: 400, crop: 'fill', format: 'webp',
+        });
+      } else if (isPDF) {
+        url_thumbnail = cloudinary.url(result.public_id, {
+          width: 800, height: 300, crop: 'fill', format: 'jpg', quality: 80, page: 1,
+        });
+      }
+    }
+
+    // Enregistrer en base
     const dbResult = await pool.query(
       `INSERT INTO medias (type, titre, description, url, url_thumbnail, tags, categorie, taille_fichier, nom_fichier, pages)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -113,10 +154,8 @@ export async function uploadFile(req, res) {
   }
 }
 
-/**
- * Importe un PDF externe (URL) vers Cloudinary et crée l'entrée en base.
- * POST /api/upload/import-pdf  { url, titre, description, tags, categorie, pages }
- */
+/* ───── importPdfByUrl ───── */
+
 export async function importPdfByUrl(req, res) {
   try {
     const { url, titre, description, tags, categorie, pages } = req.body;
@@ -125,42 +164,70 @@ export async function importPdfByUrl(req, res) {
       return res.status(400).json({ message: 'URL et titre sont requis.' });
     }
 
-    // Upload du PDF externe vers Cloudinary
-    const uploadResult = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload(
-        url,
-        {
-          folder: 'mon-archive/documents',
-          resource_type: 'image',
-          public_id: `import-${Date.now()}`,
-          timeout: 600000,
-        },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-    });
+    // Télécharger le PDF depuis l'URL externe
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      return res.status(400).json({ message: `Impossible de télécharger le PDF (HTTP ${resp.status}).` });
+    }
 
-    const cloudinaryUrl = uploadResult.secure_url;
-    const publicId = uploadResult.public_id;
+    const pdfBuf = Buffer.from(await resp.arrayBuffer());
+    const size = pdfBuf.length;
+    const isLarge = size > MAX_CLOUDINARY_BYTES;
 
-    // Vignette page 1
-    const url_thumbnail = cloudinary.url(publicId, {
-      width: 800,
-      height: 300,
-      crop: 'fill',
-      format: 'jpg',
-      quality: 80,
-      page: 1,
-    });
+    let pdfUrl = '';
+    let url_thumbnail = '';
+
+    if (isLarge) {
+      // ── STOCKAGE LOCAL (> 10 Mo) ──
+      const localName = makePublicId('import', titre) + '.pdf';
+      const thumbName = `thumb-${localName.replace(/\.[^.]+$/, '.jpg')}`;
+
+      const filePath = path.join(UPLOADS_DIR, localName);
+      const thumbPath = path.join(UPLOADS_DIR, 'thumbnails', thumbName);
+
+      fs.writeFileSync(filePath, pdfBuf);
+      pdfUrl = `/api/files/${localName}`;
+
+      try {
+        const thumbBuffer = await generatePdfThumbnail(pdfBuf);
+        fs.writeFileSync(thumbPath, thumbBuffer);
+        url_thumbnail = `/api/files/thumbnails/${thumbName}`;
+      } catch (thumbErr) {
+        console.error('Échec génération vignette PDF local (import):', thumbErr.message);
+      }
+    } else {
+      // ── UPLOAD CLOUDINARY (≤ 10 Mo) ──
+      const publicId = makePublicId('import', titre);
+
+      const uploadResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload(
+          url,
+          {
+            folder: 'mon-archive/documents',
+            resource_type: 'image',
+            public_id: publicId,
+            timeout: 600000,
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+      });
+
+      pdfUrl = uploadResult.secure_url;
+
+      url_thumbnail = cloudinary.url(uploadResult.public_id, {
+        width: 800, height: 300, crop: 'fill', format: 'jpg', quality: 80, page: 1,
+      });
+    }
 
     // Enregistrer en base
     const dbResult = await pool.query(
       `INSERT INTO medias (type, titre, description, url, url_thumbnail, tags, categorie, taille_fichier, nom_fichier, pages)
        VALUES ('document', $1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [titre, description || '', cloudinaryUrl, url_thumbnail, tags || '', categorie || '', uploadResult.bytes || 0, `import-${Date.now()}.pdf`, pages || 0]
+      [titre, description || '', pdfUrl, url_thumbnail, tags || '', categorie || '', size, `import-${Date.now()}.pdf`, pages || 0]
     );
 
     return res.status(201).json({

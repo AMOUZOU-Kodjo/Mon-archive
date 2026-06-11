@@ -4,6 +4,16 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+['', 'thumbnails'].forEach(dir => {
+  const p = path.join(uploadsDir, dir);
+  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+});
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -28,6 +38,9 @@ app.use(morgan('dev')); // Logs des requêtes
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(cookieParser()); // Parsing des cookies
+
+// Fichiers locaux (uploads > 10 Mo)
+app.use('/api/files', express.static(uploadsDir));
 
 // === Routes ===
 app.use('/api/auth', authRoutes);
