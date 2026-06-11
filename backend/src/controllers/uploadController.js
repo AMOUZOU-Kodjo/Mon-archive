@@ -108,7 +108,8 @@ export async function uploadFile(req, res) {
     });
   } catch (error) {
     console.error('Erreur lors de l\'upload:', error);
-    return res.status(500).json({ message: 'Erreur lors de l\'upload du fichier.' });
+    const detail = error.message || error.http_code || '';
+    return res.status(500).json({ message: `Erreur lors de l'upload : ${detail}` });
   }
 }
 
@@ -168,6 +169,7 @@ export async function importPdfByUrl(req, res) {
     });
   } catch (error) {
     console.error('Erreur lors de l\'import du PDF:', error);
-    return res.status(500).json({ message: "Erreur lors de l'import du PDF." });
+    const detail = error.message || error.http_code || '';
+    return res.status(500).json({ message: `Erreur lors de l'import du PDF : ${detail}` });
   }
 }
