@@ -26,6 +26,7 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
 
   const currentType = types.find((t) => t.value === type);
@@ -72,6 +73,7 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
     setError('');
     if (!file || !titre) { setError('Le fichier et le titre sont requis.'); return; }
     setLoading(true);
+    setUploadProgress(0);
     try {
       const formData = new FormData();
       formData.append('fichier', file);
@@ -79,7 +81,14 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
       formData.append('description', description);
       formData.append('tags', tags);
       formData.append('pages', pages || 0);
-      await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          setUploadProgress(pct);
+        },
+      });
+      setUploadProgress(100);
       setSuccess(true);
       resetForm();
       setTimeout(() => setSuccess(false), 3000);
@@ -283,8 +292,18 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
             </div>
           )}
 
+          {loading && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs text-base-content/60">
+                <span>Upload en cours...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <progress className="progress progress-primary w-full" value={uploadProgress} max="100" />
+            </div>
+          )}
+
           <button type="submit" disabled={loading} className="btn btn-primary w-full shadow-sm">
-            {loading ? <><span className="loading loading-spinner loading-sm" /> Upload en cours...</> : <><HiOutlineUpload className="text-lg" /> Uploader le fichier</>}
+            {loading ? <><HiOutlineUpload className="text-lg" /> Upload en cours...</> : <><HiOutlineUpload className="text-lg" /> Uploader le fichier</>}
           </button>
         </form>
       )}
