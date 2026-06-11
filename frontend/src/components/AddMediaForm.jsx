@@ -115,35 +115,46 @@ export default function AddMediaForm({ mediaType, onAddComplete }) {
         </div>
       )}
 
-      {/* Type + Mode */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Type (si non imposé) */}
-        {!mediaType && currentType && (
-          <div className="flex items-center gap-2 text-sm text-base-content/60">
-            <currentType.icon className={`text-lg ${currentType.color}`} />
-            <span><strong>{currentType.label}</strong></span>
-          </div>
-        )}
-
-        {/* Onglets mode */}
-        <div className="join flex-1">
-          <button
-            type="button"
-            onClick={() => setMode('link')}
-            className={`join-item btn btn-sm flex-1 ${mode === 'link' ? 'btn-primary' : 'btn-ghost'}`}
-          >
-            <HiOutlineLink className="text-base" />
-            Par lien
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('file')}
-            className={`join-item btn btn-sm flex-1 ${mode === 'file' ? 'btn-primary' : 'btn-ghost'}`}
-          >
-            <HiOutlineCloudUpload className="text-base" />
-            Fichier
-          </button>
+      {/* Sélecteur de type */}
+      {!mediaType && (
+        <div className="flex flex-wrap gap-2">
+          {types.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setType(t.value)}
+                className={`btn btn-sm rounded-full gap-1.5 ${
+                  type === t.value ? 'btn-primary' : 'btn-ghost bg-base-200/50 hover:bg-base-200'
+                }`}
+              >
+                <Icon className="text-sm" />
+                {t.label}
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      {/* Mode */}
+      <div className="join w-full">
+        <button
+          type="button"
+          onClick={() => setMode('link')}
+          className={`join-item btn btn-sm flex-1 ${mode === 'link' ? 'btn-primary' : 'btn-ghost'}`}
+        >
+          <HiOutlineLink className="text-base" />
+          Par lien
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('file')}
+          className={`join-item btn btn-sm flex-1 ${mode === 'file' ? 'btn-primary' : 'btn-ghost'}`}
+        >
+          <HiOutlineCloudUpload className="text-base" />
+          Fichier
+        </button>
       </div>
 
           {/* ==== Formulaire LIEN ==== */}

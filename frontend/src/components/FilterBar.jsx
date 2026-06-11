@@ -2,10 +2,10 @@ import { HiOutlineSearch } from 'react-icons/hi';
 
 const categories = [
   { value: '', label: 'Tout' },
-  { value: 'cours', label: 'Cours' },
-  { value: 'révision', label: 'Révision' },
-  { value: 'examen', label: 'Examen' },
-  { value: 'exercice', label: 'Exercice' },
+  { value: 'Cours', label: 'Cours' },
+  { value: 'Révision', label: 'Révision' },
+  { value: 'Examen', label: 'Examen' },
+  { value: 'Exercice', label: 'Exercice' },
 ];
 
 export default function FilterBar({ searchTerm, onSearchChange, selectedCategory, onCategoryChange, categories: customCategories }) {

@@ -14,7 +14,7 @@ export async function getAllMedia(req, res) {
       if (type) { params.push(type); query += ` AND type = $${params.length}`; }
       if (tag) { params.push(`%${tag}%`); query += ` AND tags ILIKE $${params.length}`; }
       if (search) { params.push(`%${search}%`); query += ` AND (titre ILIKE $${params.length} OR description ILIKE $${params.length})`; }
-      if (categorie) { params.push(categorie); query += ` AND categorie = $${params.length}`; }
+      if (categorie) { params.push(categorie); query += ` AND LOWER(categorie) = LOWER($${params.length})`; }
       query += ' ORDER BY date_creation DESC';
       const result = await pool.query(query, params);
       return res.status(200).json({ data: result.rows, pagination: null });
@@ -41,7 +41,7 @@ export async function getAllMedia(req, res) {
     }
     if (categorie) {
       params.push(categorie);
-      whereClause += ` AND categorie = $${params.length}`;
+      whereClause += ` AND LOWER(categorie) = LOWER($${params.length})`;
     }
 
     // Total count for pagination

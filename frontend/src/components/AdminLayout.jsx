@@ -44,7 +44,7 @@ export default function AdminLayout({ children }) {
   return (
     <div className="min-h-screen flex bg-base-200">
       {/* Sidebar — always visible */}
-      <aside className="w-64 bg-base-100 shadow-lg flex flex-col border-r border-base-200 shrink-0">
+      <aside className="w-64 bg-base-100 shadow-lg flex flex-col border-r border-base-200 shrink-0 sticky top-0 h-screen">
         {/* Logo */}
         <div className="flex items-center h-14 px-4 border-b border-base-200">
           <Link to="/dashboard" className="flex items-center gap-2">
@@ -104,7 +104,7 @@ export default function AdminLayout({ children }) {
       </aside>
 
       {/* Contenu principal */}
-      <main className="flex-1 min-h-screen flex flex-col min-w-0">
+      <main className="flex-1 h-screen overflow-y-auto flex flex-col min-w-0">
         <div className="flex-1 p-4 md:p-6 lg:p-8 fade-in">
           {children}
         </div>

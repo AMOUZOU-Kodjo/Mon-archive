@@ -27,7 +27,7 @@ export default function PhotoDetail() {
         return api.get(`/medias?type=photo`);
       })
       .then((res) => {
-        setSimilaires(res.data.filter((m) => m.id !== Number(id)).slice(0, 4));
+        setSimilaires(res.data.data.filter((m) => m.id !== Number(id)).slice(0, 4));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
